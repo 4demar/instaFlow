@@ -1,0 +1,17 @@
+{
+  "name": "InstaFlow - Marketing para Instagram com IA",
+  "short_name": "InstaFlow",
+  "description": "Crie, organize e publique conteúdos para Instagram com auxílio de IA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#aa3bff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
