@@ -11,8 +11,8 @@ import {
   orderBy,
   Timestamp,
 } from 'firebase/firestore'
-import { db } from '../database/configuracaoFirebase'
 import type { Post, StatusPost } from '../types/post'
+import { db } from '../database/firebaseConfig'
 
 function colecaoPosts(uid: string) {
   return collection(db, 'usuarios', uid, 'posts')

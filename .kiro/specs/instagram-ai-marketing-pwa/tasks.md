@@ -21,7 +21,7 @@ Implementação incremental do InstaFlow utilizando React 19 + TypeScript + Vite
     - _Requisitos: 2.1, 10.1, 15.1_
 
   - [x] 1.3 Configurar Firebase (Auth + Firestore) em `src/database/`
-    - Criar `src/database/configuracaoFirebase.ts` com inicialização do Firebase App, Auth e Firestore usando variáveis de ambiente
+    - Criar `src/database/firebaseConfig.ts` com inicialização do Firebase App, Auth e Firestore usando variáveis de ambiente
     - Exportar instâncias de `auth` e `db` (Firestore)
     - _Requisitos: 19.1, 19.2, 19.3_
 

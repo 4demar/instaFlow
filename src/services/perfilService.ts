@@ -5,8 +5,8 @@ import {
   updateDoc,
   serverTimestamp,
 } from 'firebase/firestore'
-import { db } from '../database/configuracaoFirebase'
 import type { PerfilMarketing } from '../types/perfilMarketing'
+import { db } from '../database/firebaseConfig'
 
 const COLECAO_PERFIL = 'perfil'
 

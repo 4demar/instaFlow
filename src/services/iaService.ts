@@ -1,4 +1,3 @@
-import OpenAI from 'openai'
 import type { ObjetivoMarketing, TomComunicacao } from '../types/perfilMarketing'
 import type { Roteiro } from '../types/roteiro'
 import type { HashtagSugerida } from '../types/hashtag'
@@ -19,41 +18,64 @@ export interface RespostaIA<T> {
   erro?: string
 }
 
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true,
-})
+const GEMINI_API_KEY =
+  import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY || ''
 
 function montarContextoPerfil(config: ConfiguracaoGeracaoIA): string {
   return `Nicho: ${config.nicho}\nPúblico-alvo: ${config.publicoAlvo}\nObjetivo: ${config.objetivo}\nTom de comunicação: ${config.tomComunicacao}`
 }
 
-async function chamarOpenAI<T>(
+async function chamarGemini<T>(
   mensagemSistema: string,
   mensagemUsuario: string,
   parsear: (texto: string) => T
 ): Promise<RespostaIA<T>> {
   try {
-    const resposta = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: mensagemSistema },
-        { role: 'user', content: mensagemUsuario },
-      ],
-      temperature: 0.8,
+    if (!GEMINI_API_KEY) {
+      return { sucesso: false, erro: 'Chave da API do Gemini não configurada.' }
+    }
+
+    const prompt = `${mensagemSistema}\n\n${mensagemUsuario}`
+    const endpoint =
+      'https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key=' +
+      encodeURIComponent(GEMINI_API_KEY)
+
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: { text: prompt },
+        temperature: 0.8,
+        maxOutputTokens: 800,
+        candidateCount: 1,
+      }),
     })
-    const conteudo = resposta.choices[0]?.message?.content
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '')
+      throw new Error(`${res.status} ${res.statusText} ${body}`)
+    }
+
+    const json = await res.json()
+    // text-bison response usually in json.candidates[0].output (or .content). Fallbacks included.
+    const conteudo =
+      (json?.candidates && (json.candidates[0]?.output || json.candidates[0]?.content)) ||
+      json?.output ||
+      json?.text ||
+      ''
+
     if (!conteudo) {
       return { sucesso: false, erro: 'A IA não retornou conteúdo. Tente novamente.' }
     }
-    const dados = parsear(conteudo)
+
+    const dados = parsear(extrairJSON(String(conteudo)))
     return { sucesso: true, dados }
   } catch (erro: unknown) {
-    return { sucesso: false, erro: tratarErroOpenAI(erro) }
+    return { sucesso: false, erro: tratarErroGemini(erro) }
   }
 }
 
-function tratarErroOpenAI(erro: unknown): string {
+function tratarErroGemini(erro: unknown): string {
   if (erro instanceof Error) {
     const mensagem = erro.message.toLowerCase()
     if (mensagem.includes('rate limit') || mensagem.includes('429')) {
@@ -65,8 +87,8 @@ function tratarErroOpenAI(erro: unknown): string {
     if (mensagem.includes('network') || mensagem.includes('fetch')) {
       return 'Erro de conexão. Verifique sua internet e tente novamente.'
     }
-    if (mensagem.includes('401') || mensagem.includes('unauthorized')) {
-      return 'Chave de API inválida. Verifique suas configurações.'
+    if (mensagem.includes('401') || mensagem.includes('unauthorized') || mensagem.includes('forbidden')) {
+      return 'Chave de API inválida ou sem permissão. Verifique suas configurações.'
     }
   }
   return 'Erro ao se comunicar com a IA. Tente novamente mais tarde.'
@@ -82,7 +104,7 @@ function extrairJSON(texto: string): string {
  */
 export async function gerarIdeias(config: ConfiguracaoGeracaoIA): Promise<RespostaIA<string[]>> {
   const contexto = montarContextoPerfil(config)
-  return chamarOpenAI<string[]>(
+  return chamarGemini<string[]>(
     `Você é um especialista em marketing para Instagram. Gere ideias de posts criativas e relevantes.\n\nContexto do perfil:\n${contexto}`,
     'Gere 5 ideias de posts para Instagram. Retorne um JSON array de strings, sem explicações adicionais.',
     (texto) => JSON.parse(extrairJSON(texto))
@@ -97,7 +119,7 @@ export async function gerarLegenda(
   ideia: string
 ): Promise<RespostaIA<string>> {
   const contexto = montarContextoPerfil(config)
-  return chamarOpenAI<string>(
+  return chamarGemini<string>(
     `Você é um copywriter especialista em Instagram. Crie legendas com foco em conversão, incluindo CTAs relevantes.\n\nContexto do perfil:\n${contexto}`,
     `Crie uma legenda para o seguinte post: "${ideia}". Retorne apenas o texto da legenda, sem JSON.`,
     (texto) => texto.trim()
@@ -112,7 +134,7 @@ export async function gerarHashtags(
   conteudo: string
 ): Promise<RespostaIA<HashtagSugerida[]>> {
   const contexto = montarContextoPerfil(config)
-  return chamarOpenAI<HashtagSugerida[]>(
+  return chamarGemini<HashtagSugerida[]>(
     `Você é um especialista em hashtags para Instagram. Sugira hashtags categorizadas por relevância.\n\nContexto do perfil:\n${contexto}`,
     `Sugira 15 hashtags para o conteúdo: "${conteudo}". Retorne um JSON array com objetos { "texto": "#hashtag", "relevancia": "alta"|"media"|"baixa" }.`,
     (texto) => JSON.parse(extrairJSON(texto))
@@ -127,7 +149,7 @@ export async function gerarRoteiro(
   ideia: string
 ): Promise<RespostaIA<Roteiro>> {
   const contexto = montarContextoPerfil(config)
-  return chamarOpenAI<Roteiro>(
+  return chamarGemini<Roteiro>(
     `Você é um roteirista de reels para Instagram. Crie roteiros estruturados com gancho, desenvolvimento e CTA.\n\nContexto do perfil:\n${contexto}`,
     `Crie um roteiro para reel sobre: "${ideia}". Retorne um JSON com { "gancho": "...", "desenvolvimento": "...", "chamadaAcao": "..." }.`,
     (texto) => {
@@ -145,7 +167,7 @@ export async function gerarVariacoes(
   ideia: string
 ): Promise<RespostaIA<VariacaoConteudo[]>> {
   const contexto = montarContextoPerfil(config)
-  return chamarOpenAI<VariacaoConteudo[]>(
+  return chamarGemini<VariacaoConteudo[]>(
     `Você é um estrategista de conteúdo para Instagram. Expanda ideias em múltiplos formatos.\n\nContexto do perfil:\n${contexto}`,
     `Expanda a ideia "${ideia}" em 3 variações (post, story, reel). Retorne um JSON array com objetos { "formato": "post"|"story"|"reel", "legenda": "...", "hashtags": ["..."] }.`,
     (texto) => JSON.parse(extrairJSON(texto))
@@ -159,7 +181,7 @@ export async function gerarPlanoSemanal(
   config: ConfiguracaoGeracaoIA
 ): Promise<RespostaIA<PostPlano[]>> {
   const contexto = montarContextoPerfil(config)
-  return chamarOpenAI<PostPlano[]>(
+  return chamarGemini<PostPlano[]>(
     `Você é um estrategista de marketing para Instagram. Crie planos semanais completos.\n\nContexto do perfil:\n${contexto}`,
     `Gere um plano semanal com 7 posts (um por dia, domingo=0 a sábado=6). Retorne um JSON array com objetos { "diaSemana": 0-6, "ideia": "...", "legenda": "...", "hashtags": ["..."], "horarioSugerido": "HH:MM", "aprovado": false }.`,
     (texto) => JSON.parse(extrairJSON(texto))
@@ -180,7 +202,7 @@ export async function analisarDesempenho(
     alcance: m.alcance,
     salvamentos: m.salvamentos,
   }))
-  return chamarOpenAI<SugestaoMelhoria[]>(
+  return chamarGemini<SugestaoMelhoria[]>(
     `Você é um analista de marketing para Instagram. Analise métricas e sugira melhorias.\n\nContexto do perfil:\n${contexto}`,
     `Analise estas métricas e sugira melhorias: ${JSON.stringify(dadosMetricas)}. Retorne um JSON array com objetos { "categoria": "...", "descricao": "...", "prioridade": "alta"|"media"|"baixa" }.`,
     (texto) => JSON.parse(extrairJSON(texto))
@@ -200,7 +222,7 @@ export async function sugerirHorarios(
     ? `Com base nestas métricas: ${JSON.stringify(metricas.map((m) => ({ curtidas: m.curtidas, comentarios: m.comentarios })))}, sugira os melhores horários de postagem.`
     : `Não há métricas registradas. Sugira horários padrão baseados em boas práticas para o nicho "${config.nicho}".`
 
-  return chamarOpenAI<HorarioSugerido[]>(
+  return chamarGemini<HorarioSugerido[]>(
     `Você é um especialista em engajamento no Instagram. Sugira horários ideais de postagem.\n\nContexto do perfil:\n${contexto}`,
     `${prompt} Retorne um JSON array com objetos { "diaSemana": 0-6, "horario": "HH:MM", "confianca": 0.0-1.0 }.`,
     (texto) => JSON.parse(extrairJSON(texto))

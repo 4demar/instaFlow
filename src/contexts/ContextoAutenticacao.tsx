@@ -1,12 +1,12 @@
 import { createContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import { onAuthStateChanged, type User } from 'firebase/auth'
-import { auth } from '../database/configuracaoFirebase'
 import {
   loginComEmail,
   loginComGoogle,
   registrar,
   sair,
 } from '../services/autenticacaoService'
+import { auth } from '../database/firebaseConfig'
 
 export interface ContextoAutenticacaoTipo {
   usuario: User | null

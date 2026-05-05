@@ -12,4 +12,8 @@ export default defineConfig({
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
     css: false,
   },
+  server: {
+    host: true, // 🔥 libera acesso externo
+    port: 5173
+  }
 })

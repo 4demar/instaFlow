@@ -6,7 +6,7 @@ import {
   signOut,
   type UserCredential,
 } from 'firebase/auth'
-import { auth } from '../database/configuracaoFirebase'
+import { auth } from '../database/firebaseConfig'
 
 /**
  * Mapeamento de códigos de erro do Firebase Auth para mensagens descritivas em português.

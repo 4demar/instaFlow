@@ -8,8 +8,8 @@ import {
   query,
   where,
 } from 'firebase/firestore'
-import { db } from '../database/configuracaoFirebase'
 import type { Metrica } from '../types/metrica'
+import { db } from '../database/firebaseConfig'
 
 function colecaoMetricas(uid: string) {
   return collection(db, 'usuarios', uid, 'metricas')
