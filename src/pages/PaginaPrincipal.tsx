@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router-dom'
-import { useAutenticacao } from '../hooks/useAutenticacao'
 import { usePosts } from '../hooks/usePosts'
 import { usePerfilMarketing } from '../hooks/usePerfilMarketing'
 import BotaoAcao from '../components/BotaoAcao'
@@ -7,7 +6,6 @@ import CartaoPost from '../components/CartaoPost'
 import CarregandoSpinner from '../components/CarregandoSpinner'
 
 export default function PaginaPrincipal() {
-  const { usuario, logout } = useAutenticacao()
   const { posts, carregando, filtrarPorStatus } = usePosts()
   const { perfil } = usePerfilMarketing()
   const navegar = useNavigate()
@@ -19,18 +17,11 @@ export default function PaginaPrincipal() {
   if (carregando) return <CarregandoSpinner mensagem="Carregando dashboard..." />
 
   return (
-    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '24px 20px 100px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: '24px' }}>📸 InstaFlow</h2>
-          <p style={{ fontSize: '14px', color: 'var(--text)', margin: '4px 0 0' }}>
-            Olá, {usuario?.displayName || usuario?.email?.split('@')[0] || 'usuário'}
-          </p>
-        </div>
-        <BotaoAcao variante="secundario" onClick={logout} style={{ fontSize: '13px', padding: '8px 14px' }}>
+    <div style={{ maxWidth: '600px', margin: '0 auto', padding: '24px 20px' }}>
+
+      {/* <BotaoAcao variante="secundario" onClick={logout} style={{ fontSize: '13px', padding: '8px 14px' }}>
           Sair
-        </BotaoAcao>
-      </div>
+        </BotaoAcao> */}
 
       {!perfil && (
         <div style={{ padding: '20px', borderRadius: '12px', border: '2px dashed var(--accent-border)', background: 'var(--accent-bg)', marginBottom: '24px', textAlign: 'center' }}>

@@ -1,7 +1,9 @@
 :root {
   --text: #6b6375;
   --text-h: #08060d;
-  --bg: #fff;
+  --bg: #f4f4f4;
+  --bg-input: '#fff';
+  --drawerCard: #e5e7eb;
   --border: #e5e4e7;
   --code-bg: #f4f3ec;
   --accent: #aa3bff;
@@ -27,6 +29,8 @@
     --text: #9ca3af;
     --text-h: #f3f4f6;
     --bg: #16171d;
+    --bg-input: '#323238';
+    --drawerCard: '#29292E';
     --border: #2e303a;
     --code-bg: #1f2028;
     --accent: #c084fc;
@@ -53,7 +57,9 @@ body {
   flex-direction: column;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
   font-family: var(--sans);
   font-weight: 600;
   color: var(--text-h);
@@ -78,6 +84,9 @@ a {
   text-decoration: none;
 }
 
-input, textarea, select, button {
+input,
+textarea,
+select,
+button {
   font-family: var(--sans);
 }

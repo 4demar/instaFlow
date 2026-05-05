@@ -4,24 +4,23 @@ import { ProvedorConexao } from './contexts/ContextoConexao'
 import { ProvedorPerfil } from './contexts/ContextoPerfil'
 import { ProvedorPosts } from './contexts/ContextoPosts'
 import IndicadorOffline from './components/IndicadorOffline'
-import MenuNavegacao from './components/MenuNavegacao'
-import Rotas from './routes/Rotas'
+import AppRoutes from './routes/AppRoutes'
 
 function App() {
+
   return (
-    <BrowserRouter>
-      <ProvedorAutenticacao>
-        <ProvedorConexao>
-          <ProvedorPerfil>
-            <ProvedorPosts>
-              <IndicadorOffline />
-              <Rotas />
-              <MenuNavegacao />
-            </ProvedorPosts>
-          </ProvedorPerfil>
-        </ProvedorConexao>
-      </ProvedorAutenticacao>
-    </BrowserRouter>
+    <ProvedorAutenticacao>
+      <ProvedorConexao>
+        <ProvedorPerfil>
+          <ProvedorPosts>
+            <IndicadorOffline />
+            <BrowserRouter >
+              <AppRoutes />
+            </BrowserRouter >
+          </ProvedorPosts>
+        </ProvedorPerfil>
+      </ProvedorConexao>
+    </ProvedorAutenticacao>
   )
 }
 

@@ -33,10 +33,15 @@ export function ProvedorAutenticacao({ children }: ProvedorAutenticacaoProps) {
   useEffect(() => {
     const cancelar = onAuthStateChanged(auth, (user) => {
       setUsuario(user)
+      // debug: log mudanças de usuário para ajudar a diagnosticar issues de rota
+      // Remover em produção se não for mais necessário
+      // eslint-disable-next-line no-console
+      console.debug('[ContextoAutenticacao] onAuthStateChanged ->', user)
       setCarregando(false)
     })
     return cancelar
   }, [])
+
 
   const limparErro = useCallback(() => setErro(null), [])
 
@@ -44,7 +49,8 @@ export function ProvedorAutenticacao({ children }: ProvedorAutenticacaoProps) {
     try {
       setErro(null)
       setCarregando(true)
-      await loginComEmail(email, senha)
+      const { user } = await loginComEmail(email, senha)
+      setUsuario(user)
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao fazer login.')
     } finally {
@@ -56,7 +62,8 @@ export function ProvedorAutenticacao({ children }: ProvedorAutenticacaoProps) {
     try {
       setErro(null)
       setCarregando(true)
-      await loginComGoogle()
+      const { user } = await loginComGoogle()
+      setUsuario(user)
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro ao fazer login com Google.')
     } finally {

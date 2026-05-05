@@ -18,5 +18,5 @@ export default function RotaProtegida({ children }: PropriedadesRotaProtegida) {
     return <Navigate to="/login" replace />
   }
 
-  return <>{children}</>
+  return children;
 }

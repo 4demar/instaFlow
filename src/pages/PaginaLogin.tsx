@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAutenticacao } from '../hooks/useAutenticacao'
 import CampoTexto from '../components/CampoTexto'
@@ -8,21 +8,25 @@ import MensagemErro from '../components/MensagemErro'
 export default function PaginaLogin() {
   const [email, setEmail] = useState('')
   const [senha, setSenha] = useState('')
-  const { login, loginGoogle, carregando, erro, limparErro } = useAutenticacao()
+  const { login, loginGoogle, carregando, erro, limparErro, usuario } = useAutenticacao()
   const navegar = useNavigate()
 
   async function aoSubmeter(e: FormEvent) {
     e.preventDefault()
     limparErro()
     await login(email, senha)
-    navegar('/')
   }
 
   async function aoLoginGoogle() {
     limparErro()
     await loginGoogle()
-    navegar('/')
   }
+
+  useEffect(() => {
+    if (usuario) {
+      navegar('/', { replace: true })
+    }
+  }, [usuario, navegar])
 
   return (
     <div style={{ maxWidth: '400px', margin: '0 auto', padding: '40px 20px' }}>
