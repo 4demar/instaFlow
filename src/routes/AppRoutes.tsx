@@ -97,29 +97,29 @@ export default function AppRoutes() {
           />
 
           <Screen
-            name={'/criativos'}
+            name={'/criativos:/id?'}
             component={() => <RotaProtegida><PaginaCriativos /></RotaProtegida>}
-            options={{ drawerItemStyle: { display: 'none' } }}
+            options={{ headerTitle: 'Criativos', drawerItemStyle: { display: 'none' } }}
           />
           <Screen
-            name={'/publicacao'}
+            name={'/publicacao:/id?'}
             component={() => <RotaProtegida><PaginaPublicacao /></RotaProtegida>}
-            options={{ drawerItemStyle: { display: 'none' } }}
+            options={{ headerTitle: 'Publicação', drawerItemStyle: { display: 'none' } }}
           />
           <Screen
             name={'/metricas'}
             component={() => <RotaProtegida><PaginaMetricas /></RotaProtegida>}
-            options={{ drawerItemStyle: { display: 'none' } }}
+            options={{ headerTitle: 'Metricas', drawerItemStyle: { display: 'none' } }}
           />
           <Screen
             name={'/analise'}
             component={() => <RotaProtegida><PaginaAnalise /></RotaProtegida>}
-            options={{ drawerItemStyle: { display: 'none' } }}
+            options={{ headerTitle: 'Análise', drawerItemStyle: { display: 'none' } }}
           />
           <Screen
-            name={'/posts'}
+            name={'/post/:id'}
             component={() => <RotaProtegida><PaginaPost /></RotaProtegida>}
-            options={{ drawerItemStyle: { display: 'none' } }}
+            options={{ headerTitle: 'Posts', drawerItemStyle: { display: 'none' } }}
           />
         </Navigator>
       } />
