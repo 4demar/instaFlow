@@ -18,15 +18,22 @@ export interface RespostaIA<T> {
   erro?: string
 }
 
-const GEMINI_API_KEY =
-  import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY || ''
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
+const GEMINI_MODELO_TEXTO = 'gemini-2.0-flash'
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 function montarContextoPerfil(config: ConfiguracaoGeracaoIA): string {
   return `Nicho: ${config.nicho}\nPúblico-alvo: ${config.publicoAlvo}\nObjetivo: ${config.objetivo}\nTom de comunicação: ${config.tomComunicacao}`
 }
 
+interface RespostaGeminiTexto {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> }
+  }>
+}
+
 async function chamarGemini<T>(
-  mensagemSistema: string,
+  instrucaoSistema: string,
   mensagemUsuario: string,
   parsear: (texto: string) => T
 ): Promise<RespostaIA<T>> {
@@ -35,40 +42,44 @@ async function chamarGemini<T>(
       return { sucesso: false, erro: 'Chave da API do Gemini não configurada.' }
     }
 
-    const prompt = `${mensagemSistema}\n\n${mensagemUsuario}`
-    const endpoint =
-      'https://generativelanguage.googleapis.com/v1beta2/models/text-bison-001:generateText?key=' +
-      encodeURIComponent(GEMINI_API_KEY)
+    const endpoint = `${GEMINI_BASE_URL}/${GEMINI_MODELO_TEXTO}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`
+
+    const corpo = {
+      systemInstruction: {
+        parts: [{ text: instrucaoSistema }],
+      },
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: mensagemUsuario }],
+        },
+      ],
+      generationConfig: {
+        temperature: 0.8,
+        maxOutputTokens: 1024,
+        candidateCount: 1,
+      },
+    }
 
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: { text: prompt },
-        temperature: 0.8,
-        maxOutputTokens: 800,
-        candidateCount: 1,
-      }),
+      body: JSON.stringify(corpo),
     })
 
     if (!res.ok) {
-      const body = await res.text().catch(() => '')
-      throw new Error(`${res.status} ${res.statusText} ${body}`)
+      const corpoErro = await res.text().catch(() => '')
+      throw new Error(`${res.status} ${res.statusText} ${corpoErro}`)
     }
 
-    const json = await res.json()
-    // text-bison response usually in json.candidates[0].output (or .content). Fallbacks included.
-    const conteudo =
-      (json?.candidates && (json.candidates[0]?.output || json.candidates[0]?.content)) ||
-      json?.output ||
-      json?.text ||
-      ''
+    const json = (await res.json()) as RespostaGeminiTexto
+    const conteudo = json?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || ''
 
     if (!conteudo) {
       return { sucesso: false, erro: 'A IA não retornou conteúdo. Tente novamente.' }
     }
 
-    const dados = parsear(extrairJSON(String(conteudo)))
+    const dados = parsear(conteudo)
     return { sucesso: true, dados }
   } catch (erro: unknown) {
     return { sucesso: false, erro: tratarErroGemini(erro) }
@@ -78,7 +89,7 @@ async function chamarGemini<T>(
 function tratarErroGemini(erro: unknown): string {
   if (erro instanceof Error) {
     const mensagem = erro.message.toLowerCase()
-    if (mensagem.includes('rate limit') || mensagem.includes('429')) {
+    if (mensagem.includes('rate limit') || mensagem.includes('429') || mensagem.includes('quota')) {
       return 'Limite de requisições atingido. Aguarde alguns minutos e tente novamente.'
     }
     if (mensagem.includes('timeout') || mensagem.includes('timed out')) {
@@ -87,7 +98,13 @@ function tratarErroGemini(erro: unknown): string {
     if (mensagem.includes('network') || mensagem.includes('fetch')) {
       return 'Erro de conexão. Verifique sua internet e tente novamente.'
     }
-    if (mensagem.includes('401') || mensagem.includes('unauthorized') || mensagem.includes('forbidden')) {
+    if (
+      mensagem.includes('401') ||
+      mensagem.includes('403') ||
+      mensagem.includes('unauthorized') ||
+      mensagem.includes('forbidden') ||
+      mensagem.includes('api key')
+    ) {
       return 'Chave de API inválida ou sem permissão. Verifique suas configurações.'
     }
   }

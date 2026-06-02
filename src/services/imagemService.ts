@@ -6,15 +6,28 @@ export interface RespostaImagem {
   erro?: string
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_OPENAI_API_KEY || ''
+const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ''
+const GEMINI_MODELO_IMAGEM = 'gemini-2.5-flash-image-preview'
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-const MAPA_FORMATOS: Record<FormatoCriativo, { size: '1024x1024' | '1024x1792' }> = {
-  '1080x1080': { size: '1024x1024' },
-  '1080x1920': { size: '1024x1792' },
+const MAPA_FORMATOS: Record<FormatoCriativo, { aspecto: string; descricao: string }> = {
+  '1080x1080': { aspecto: '1:1', descricao: 'formato quadrado para post (proporção 1:1)' },
+  '1080x1920': { aspecto: '9:16', descricao: 'formato vertical para story/reel (proporção 9:16)' },
+}
+
+interface ParteGemini {
+  text?: string
+  inlineData?: { mimeType?: string; data?: string }
+}
+
+interface RespostaGeminiImagem {
+  candidates?: Array<{
+    content?: { parts?: ParteGemini[] }
+  }>
 }
 
 /**
- * Gera uma imagem usando a API de geração de imagens do Gemini (Generative AI).
+ * Gera uma imagem usando o modelo Gemini de geração de imagens.
  */
 export async function gerarImagem(
   prompt: string,
@@ -26,24 +39,26 @@ export async function gerarImagem(
     }
 
     const config = MAPA_FORMATOS[formato]
-    const endpoint =
-      'https://generativelanguage.googleapis.com/v1/images:generate?key=' + encodeURIComponent(GEMINI_API_KEY)
+    const endpoint = `${GEMINI_BASE_URL}/${GEMINI_MODELO_IMAGEM}:generateContent?key=${encodeURIComponent(GEMINI_API_KEY)}`
 
-    const body = {
-      model: 'image-bison-001',
-      prompt,
-      // tamanho na API pode variar; usamos um campo compatível com expectativas comuns
-      // (ex.: "size" ou "imageSize") — deixamos "size" conforme mapeamento acima.
-      size: config.size,
-      // solicitar retorno em base64 para uso direto no frontend
-      // alguns endpoints retornam "uri" ou "b64" — tratamos múltiplos formatos abaixo.
-      // maxRetries / safetyOptions / other params podem ser adicionados conforme necessidade.
+    const promptCompleto = `${prompt}\n\nGere a imagem no ${config.descricao}.`
+
+    const corpo = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: promptCompleto }],
+        },
+      ],
+      generationConfig: {
+        responseModalities: ['IMAGE'],
+      },
     }
 
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(corpo),
     })
 
     if (!res.ok) {
@@ -51,44 +66,38 @@ export async function gerarImagem(
       throw new Error(`${res.status} ${res.statusText} ${texto}`)
     }
 
-    const json = await res.json()
+    const json = (await res.json()) as RespostaGeminiImagem
+    const partes = json?.candidates?.[0]?.content?.parts || []
+    const parteImagem = partes.find((p) => p.inlineData?.data)
 
-    // Tentativas de localizar a imagem retornada em respostas comuns:
-    // - base64 em locais como json?.data[0]?.b64 || json?.artifacts[0]?.base64
-    // - URI em json?.data[0]?.uri || json?.artifacts[0]?.uri
-    const b64 =
-      json?.data?.[0]?.b64 ||
-      json?.artifacts?.[0]?.base64 ||
-      json?.artifacts?.[0]?.b64 ||
-      json?.output?.[0]?.b64
-
-    const uri =
-      json?.data?.[0]?.uri ||
-      json?.artifacts?.[0]?.uri ||
-      json?.output?.[0]?.uri ||
-      json?.imageUrl ||
-      json?.url
-
-    if (b64) {
-      return { sucesso: true, urlImagem: `data:image/png;base64,${b64}` }
-    }
-    if (uri) {
-      return { sucesso: true, urlImagem: uri }
+    if (parteImagem?.inlineData?.data) {
+      const mime = parteImagem.inlineData.mimeType || 'image/png'
+      return { sucesso: true, urlImagem: `data:${mime};base64,${parteImagem.inlineData.data}` }
     }
 
     return { sucesso: false, erro: 'A IA não retornou uma imagem. Tente novamente.' }
   } catch (erro: unknown) {
-    if (erro instanceof Error) {
-      const msg = erro.message.toLowerCase()
-      if (msg.includes('rate limit') || msg.includes('429')) {
-        return { sucesso: false, erro: 'Limite de requisições atingido. Aguarde e tente novamente.' }
-      }
-      if (msg.includes('content_policy') || msg.includes('policy')) {
-        return { sucesso: false, erro: 'O conteúdo solicitado viola as políticas. Tente outro prompt.' }
-      }
-    }
-    return { sucesso: false, erro: 'Erro ao gerar imagem. Tente novamente mais tarde.' }
+    return { sucesso: false, erro: tratarErroImagem(erro) }
   }
+}
+
+function tratarErroImagem(erro: unknown): string {
+  if (erro instanceof Error) {
+    const msg = erro.message.toLowerCase()
+    if (msg.includes('rate limit') || msg.includes('429') || msg.includes('quota')) {
+      return 'Limite de requisições atingido. Aguarde e tente novamente.'
+    }
+    if (msg.includes('safety') || msg.includes('policy') || msg.includes('blocked')) {
+      return 'O conteúdo solicitado viola as políticas. Tente outro prompt.'
+    }
+    if (msg.includes('401') || msg.includes('403') || msg.includes('api key')) {
+      return 'Chave de API inválida ou sem permissão. Verifique suas configurações.'
+    }
+    if (msg.includes('network') || msg.includes('fetch')) {
+      return 'Erro de conexão. Verifique sua internet e tente novamente.'
+    }
+  }
+  return 'Erro ao gerar imagem. Tente novamente mais tarde.'
 }
 
 /**

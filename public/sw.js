@@ -2,20 +2,21 @@ const CACHE_NAME = 'instaflow-v1'
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
 self.addEventListener('fetch', e => {
+  // Não cachear chamadas à API do Google (Gemini)
   if (e.request.url.includes('generativelanguage.googleapis.com')) return;
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
