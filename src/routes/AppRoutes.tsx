@@ -12,9 +12,10 @@ import PaginaPublicacao from '../pages/PaginaPublicacao'
 import PaginaMetricas from '../pages/PaginaMetricas'
 import PaginaAnalise from '../pages/PaginaAnalise'
 import PaginaModoGrowth from '../pages/PaginaModoGrowth'
+import PaginaVideoFrames from '../pages/PaginaVideoFrames'
 import { useAutenticacao } from '../hooks/useAutenticacao'
 import { Navigator, Screen, type DrawerIconProps } from "./DrawerNavigator";
-import { FiCalendar, FiHome, FiTrendingUp, FiUser } from 'react-icons/fi'
+import { FiCalendar, FiFilm, FiHome, FiTrendingUp, FiUser } from 'react-icons/fi'
 import { BsFillLightbulbFill } from 'react-icons/bs'
 
 
@@ -92,6 +93,18 @@ export default function AppRoutes() {
               drawerLabel: 'Modo Growth',
               drawerIcon: ({ color }: DrawerIconProps) => (
                 <FiTrendingUp color={color} size={20} />
+              ),
+            }}
+          />
+
+          <Screen
+            name={'/video-frames'}
+            component={() => <RotaProtegida><PaginaVideoFrames /></RotaProtegida>}
+            options={{
+              headerTitle: 'Vídeo por Frames',
+              drawerLabel: 'Vídeo por Frames',
+              drawerIcon: ({ color }: DrawerIconProps) => (
+                <FiFilm color={color} size={20} />
               ),
             }}
           />

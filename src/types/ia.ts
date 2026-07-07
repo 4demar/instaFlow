@@ -17,3 +17,12 @@ export interface HorarioSugerido {
   horario: string
   confianca: number
 }
+
+import type { ObjetivoMarketing, TomComunicacao } from './perfilMarketing'
+
+export interface ConfiguracaoGeracaoIA {
+  nicho: string
+  publicoAlvo: string
+  objetivo: ObjetivoMarketing
+  tomComunicacao: TomComunicacao
+}
