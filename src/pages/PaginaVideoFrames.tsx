@@ -3,13 +3,24 @@ import BotaoAcao from '../components/BotaoAcao'
 import CarregandoSpinner from '../components/CarregandoSpinner'
 import MensagemErro from '../components/MensagemErro'
 import ListaImagensReordenavel from '../components/ListaImagensReordenavel'
+import SeletorProvedorIA from '../components/SeletorProvedorIA'
 import { useFramesVideo } from '../hooks/useFramesVideo'
+import { useProvedorIA } from '../hooks/useProvedorIA'
 import { converterArquivosEmImagens, liberarUrlsPreview } from '../utils/arquivoImagem'
 import { MAX_IMAGENS_FRAMES } from '../utils/configFramesVideo'
 import type { ImagemAnexada } from '../types/frameVideo'
 
 export default function PaginaVideoFrames() {
   const { carregando, erro, roteiro, gerarRoteiroFrames, limparErro, limparRoteiro } = useFramesVideo()
+  const {
+    provedor,
+    definirProvedor,
+    chaveApi,
+    definirChaveApi,
+    definicao,
+    configurado,
+    provedoresDisponiveis,
+  } = useProvedorIA()
   const [imagens, setImagens] = useState<ImagemAnexada[]>([])
   const [arrastandoArquivo, setArrastandoArquivo] = useState(false)
   const [copiado, setCopiado] = useState(false)
@@ -98,7 +109,11 @@ export default function PaginaVideoFrames() {
 
   async function aoGerarJson() {
     if (imagens.length === 0) return
-    await gerarRoteiroFrames(imagens)
+    if (!configurado) return
+    await gerarRoteiroFrames(imagens, {
+      provedor,
+      chaveApi: definicao.requerChaveApi ? chaveApi : undefined,
+    })
   }
 
   async function aoCopiarJson() {
@@ -118,6 +133,15 @@ export default function PaginaVideoFrames() {
       <p style={{ color: 'var(--text-h)', fontSize: '14px', marginBottom: '20px' }}>
         Anexe até {MAX_IMAGENS_FRAMES} imagens, ordene arrastando na lista e gere um JSON com a descrição de cada frame na ordem definida.
       </p>
+
+      <SeletorProvedorIA
+        provedor={provedor}
+        aoMudarProvedor={definirProvedor}
+        chaveApi={chaveApi}
+        aoMudarChaveApi={definirChaveApi}
+        definicao={definicao}
+        provedoresDisponiveis={provedoresDisponiveis}
+      />
 
       <div
         onDragOver={aoArrastarSobreArea}
@@ -193,11 +217,17 @@ export default function PaginaVideoFrames() {
       <BotaoAcao
         onClick={aoGerarJson}
         carregando={carregando}
-        disabled={imagens.length === 0}
+        disabled={imagens.length === 0 || !configurado}
         style={{ width: '100%', marginBottom: '20px' }}
       >
         Gerar JSON das Imagens
       </BotaoAcao>
+
+      {!configurado && (
+        <p style={{ color: '#eab308', fontSize: '13px', margin: '-8px 0 16px' }}>
+          Informe a chave da API do provedor selecionado para continuar.
+        </p>
+      )}
 
       {erro && (
         <div style={{ marginBottom: '16px' }}>

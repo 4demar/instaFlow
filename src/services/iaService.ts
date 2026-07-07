@@ -8,14 +8,15 @@ import type {
 } from '../types/ia'
 import type { PostPlano } from '../types/planoSemanal'
 import type { Metrica } from '../types/metrica'
-import type { RoteiroFramesVideo } from '../types/frameVideo'
+import type { FrameVideo, RoteiroFramesVideo } from '../types/frameVideo'
+import type { IdProvedorIA } from '../types/provedorIA'
 import {
   chamarGeminiTexto,
-  chamarGeminiMultimodal,
   extrairJSON,
   type ParteMultimodal,
   type RespostaGemini,
 } from './geminiService'
+import { chamarProvedorIA } from './provedores'
 
 export type { ConfiguracaoGeracaoIA }
 import { instrucaoSistemaIdeias, mensagemUsuarioIdeias } from '../utils/prompts/promptIdeias'
@@ -153,12 +154,98 @@ export async function sugerirHorarios(
   return mapearResposta<HorarioSugerido[]>(resposta, (texto) => JSON.parse(extrairJSON(texto)))
 }
 
+export interface ConfiguracaoProvedorFrames {
+  provedor: IdProvedorIA
+  chaveApi?: string
+}
+
+interface ImagemFrame {
+  nome: string
+  tipoMime: string
+  dadosBase64: string
+}
+
+function frameMinimoDeDescricao(descricao: string, ordem: number, nomeArquivo: string): FrameVideo {
+  return {
+    ordem,
+    nomeArquivo,
+    descricao,
+    elementosPrincipais: [],
+    cores: [],
+    atmosfera: '',
+    duracaoSugeridaSegundos: 3,
+  }
+}
+
+async function gerarFramesLote(
+  config: ConfiguracaoProvedorFrames,
+  lote: ImagemFrame[],
+  deslocamento: number,
+  total: number
+): Promise<RespostaIA<FrameVideo[]>> {
+  // Transformers.js só analisa uma imagem por vez e não emite JSON;
+  // então geramos frame a frame e montamos o objeto no cliente.
+  if (config.provedor === 'transformers') {
+    const frames: FrameVideo[] = []
+    for (let i = 0; i < lote.length; i++) {
+      const imagem = lote[i]
+      const resposta = await chamarProvedorIA(
+        'transformers',
+        instrucaoSistemaFramesVideo(),
+        [{ imagemInline: { tipoMime: imagem.tipoMime, dadosBase64: imagem.dadosBase64 } }]
+      )
+      if (!resposta.sucesso || !resposta.dados) {
+        return { sucesso: false, erro: resposta.erro ?? 'Falha ao processar imagem local.' }
+      }
+      frames.push(frameMinimoDeDescricao(resposta.dados, deslocamento + i + 1, imagem.nome))
+    }
+    return { sucesso: true, dados: frames }
+  }
+
+  const partes: ParteMultimodal[] = [
+    {
+      texto: mensagemUsuarioFramesVideo(
+        lote.map((img) => img.nome),
+        { deslocamento, total }
+      ),
+    },
+    ...lote.map((img) => ({
+      imagemInline: { tipoMime: img.tipoMime, dadosBase64: img.dadosBase64 },
+    })),
+  ]
+
+  const resposta = await chamarProvedorIA(
+    config.provedor,
+    instrucaoSistemaFramesVideo(),
+    partes,
+    { temperatura: 0.4, maxTokens: 4096 },
+    config.chaveApi
+  )
+
+  if (!resposta.sucesso || !resposta.dados) {
+    return { sucesso: false, erro: resposta.erro }
+  }
+
+  try {
+    const parcial = JSON.parse(extrairJSON(resposta.dados)) as RoteiroFramesVideo
+    const framesAjustados = parcial.frames.map((frame, indiceLote) => ({
+      ...frame,
+      ordem: deslocamento + indiceLote + 1,
+      nomeArquivo: lote[indiceLote]?.nome ?? frame.nomeArquivo,
+    }))
+    return { sucesso: true, dados: framesAjustados }
+  } catch {
+    return { sucesso: false, erro: 'Não foi possível interpretar o JSON retornado pela IA.' }
+  }
+}
+
 /**
  * Gera um roteiro de frames de vídeo a partir de uma lista ordenada de imagens.
- * Divide a lista em lotes de tamanho fixo e mescla os frames preservando a ordem global.
+ * Divide a lista em lotes e delega ao provedor escolhido.
  */
 export async function gerarFramesVideo(
-  imagens: Array<{ nome: string; tipoMime: string; dadosBase64: string }>
+  imagens: ImagemFrame[],
+  config: ConfiguracaoProvedorFrames
 ): Promise<RespostaIA<RoteiroFramesVideo>> {
   if (imagens.length === 0) {
     return { sucesso: false, erro: 'Nenhuma imagem enviada.' }
@@ -170,44 +257,15 @@ export async function gerarFramesVideo(
     }
   }
 
-  const framesConsolidados: RoteiroFramesVideo['frames'] = []
+  const framesConsolidados: FrameVideo[] = []
 
   for (let inicio = 0; inicio < imagens.length; inicio += TAMANHO_LOTE_FRAMES) {
     const lote = imagens.slice(inicio, inicio + TAMANHO_LOTE_FRAMES)
-
-    const partes: ParteMultimodal[] = [
-      {
-        texto: mensagemUsuarioFramesVideo(
-          lote.map((img) => img.nome),
-          { deslocamento: inicio, total: imagens.length }
-        ),
-      },
-      ...lote.map((img) => ({
-        imagemInline: { tipoMime: img.tipoMime, dadosBase64: img.dadosBase64 },
-      })),
-    ]
-
-    const resposta = await chamarGeminiMultimodal(
-      instrucaoSistemaFramesVideo(),
-      partes,
-      { temperatura: 0.4, maxTokens: 4096 }
-    )
-
-    const parcial = mapearResposta<RoteiroFramesVideo>(resposta, (texto) =>
-      JSON.parse(extrairJSON(texto)) as RoteiroFramesVideo
-    )
-
+    const parcial = await gerarFramesLote(config, lote, inicio, imagens.length)
     if (!parcial.sucesso || !parcial.dados) {
       return { sucesso: false, erro: parcial.erro ?? 'Falha ao gerar um dos lotes.' }
     }
-
-    parcial.dados.frames.forEach((frame, indiceLote) => {
-      framesConsolidados.push({
-        ...frame,
-        ordem: inicio + indiceLote + 1,
-        nomeArquivo: lote[indiceLote]?.nome ?? frame.nomeArquivo,
-      })
-    })
+    framesConsolidados.push(...parcial.dados)
   }
 
   return {
